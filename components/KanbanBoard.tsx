@@ -128,6 +128,7 @@ export function KanbanBoard() {
             <section
               key={col}
               className="column"
+              data-col={col}
               data-over={overCol === col}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -137,7 +138,10 @@ export function KanbanBoard() {
               onDrop={() => drop(col)}
             >
               <header className="column-head">
-                <span className="column-name">{col}</span>
+                <span className="column-name">
+                  <span className="col-dot" aria-hidden="true" />
+                  {col}
+                </span>
                 <span className="column-count">{byColumn[col]?.length ?? 0}</span>
               </header>
               <div className="column-body">

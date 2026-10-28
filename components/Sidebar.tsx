@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 
 const LINKS = [
-  { href: "/kanban", label: "Kanban" },
+  { href: "/", label: "Kanban" },
   { href: "/vandaag", label: "Vandaag" },
   { href: "/scrape", label: "Nieuwe run" },
   { href: "/stats", label: "Statistieken" },
@@ -20,7 +20,7 @@ export function Sidebar() {
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: "var(--s-1)" }}>
         {LINKS.map((l) => {
-          const active = path === l.href || (l.href !== "/kanban" && path.startsWith(l.href));
+          const active = l.href === "/" ? path === "/" : path.startsWith(l.href);
           return (
             <Link key={l.href} href={l.href} className="nav-link" data-active={active}>
               {l.label}

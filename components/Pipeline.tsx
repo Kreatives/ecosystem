@@ -1,9 +1,9 @@
 /**
- * Verticale pipeline van het run-scherm (zie context/pipeline-ref.png): grote
- * lichte cirkel links, label rechts, dunne verbindingslijn met pijl ertussen.
- * De actieve stap toont de orb; komende stappen zijn gedimd; klare stappen
- * krijgen een vaste cirkel met vinkje. Puur presentational: de voortgang komt
- * van echte job-status (fase 5), niet van een eigen animatie.
+ * Verticale pipeline van het run-scherm (zie context/pipeline-ref.png), uitgevoerd
+ * als node-graph op een dotted grid: lichte node links, label rechts, glowende
+ * verbindingslijn ertussen. De actieve stap toont de orb; komende stappen zijn
+ * gedimd; klare stappen krijgen een vaste node met vinkje en een opgelichte lijn.
+ * Puur presentational: de voortgang komt van echte job-status (fase 5).
  */
 import { Orb } from "./Orb";
 
@@ -27,36 +27,38 @@ function Check() {
 
 export function Pipeline({ steps }: { steps: PipelineStep[] }) {
   return (
-    <div className="pipeline">
-      {steps.map((step, i) => (
-        <div key={step.key}>
-          <div className="pipeline-step" data-state={step.state}>
-            <div className="pipeline-node">
-              {step.state === "active" ? (
-                <Orb />
-              ) : (
-                <div className="disc" data-state={step.state}>
-                  {step.state === "done" && <Check />}
-                </div>
-              )}
+    <div className="run-canvas">
+      <div className="pipeline">
+        {steps.map((step, i) => (
+          <div key={step.key}>
+            <div className="pipeline-step" data-state={step.state}>
+              <div className="pipeline-node">
+                {step.state === "active" ? (
+                  <Orb />
+                ) : (
+                  <div className="disc" data-state={step.state}>
+                    {step.state === "done" && <Check />}
+                  </div>
+                )}
+              </div>
+              <div className="pipeline-label">
+                <span className="title">{step.title}</span>
+                {step.counter && <span className="counter">{step.counter}</span>}
+                {step.errors?.map((e, j) => (
+                  <span className="errors" key={j}>
+                    {e.naam}: {e.reden}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="pipeline-label">
-              <span className="title">{step.title}</span>
-              {step.counter && <span className="counter">{step.counter}</span>}
-              {step.errors?.map((e, j) => (
-                <span className="errors" key={j}>
-                  {e.naam}: {e.reden}
-                </span>
-              ))}
-            </div>
+            {i < steps.length - 1 && (
+              <div className="pipeline-connector" data-lit={step.state === "done"}>
+                <span />
+              </div>
+            )}
           </div>
-          {i < steps.length - 1 && (
-            <div className="pipeline-connector">
-              <span />
-            </div>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

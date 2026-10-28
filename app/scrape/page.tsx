@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { Pipeline, type PipelineStep } from "@/components/Pipeline";
 
+// Voorbeeldstaat zodat de vormgeving (done-node, opgelichte lijn, orb, tellers)
+// zichtbaar is. De echte tellers en voortgang komen via SSE in fase 5.
 const STEPS: PipelineStep[] = [
-  { key: "scrape", title: "Scraping leads", state: "active", counter: "wacht op start" },
-  { key: "qualify", title: "Qualifying leads", state: "upcoming" },
+  { key: "scrape", title: "Scraping leads", state: "done", counter: "34 gevonden" },
+  { key: "qualify", title: "Qualifying leads", state: "active", counter: "12 / 34 — 7 door, 5 weggegooid" },
   { key: "analyse", title: "Analysing websites", state: "upcoming" },
   { key: "write", title: "Writing outreach", state: "upcoming" },
 ];
@@ -75,8 +77,8 @@ export default function ScrapePage() {
       <Pipeline steps={STEPS} />
 
       <p className="run-total">
-        Dit is het run-scherm met de vaste layout en de orb-animatie op de actieve stap. De live
-        voortgang (SSE, echte tellers per stap) wordt gekoppeld in fase 5, samen met de scraper.
+        Voorbeeld van het run-scherm. De live voortgang (SSE, echte tellers per stap, foutmarkers
+        per lead) wordt gekoppeld in fase 5, samen met de scraper.
       </p>
     </>
   );

@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { KanbanBoard } from "@/components/KanbanBoard";
 
 export default function Home() {
-  redirect("/kanban");
+  return <KanbanBoard />;
 }

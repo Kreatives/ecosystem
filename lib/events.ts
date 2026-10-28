@@ -25,18 +25,17 @@ export async function logEvent(
   });
 }
 
-/**
- * Vergelijkt de nieuwe lead-staat met de vorige spiegel en logt de overgangen
- * (checkbox false→true, status-wijziging). Werkt de spiegel bij. Op de eerste
- * sync van een lead wordt alleen geseed, zonder events: die historie ligt vóór
- * de app en krijgt geen verzonnen datum.
- */
-export async function reconcileLead(lead: Lead, prev: any | null): Promise<void> {
-  const sb = supabase();
-  if (!sb) return;
+export type EventRow = {
+  page_id: string;
+  type: DbType;
+  event: string;
+  value: string | null;
+  source: 'app' | 'notion-sync';
+};
 
-  const funnel = funnelFor(lead.type);
-  const mirrorRow = {
+/** Eén spiegelrij voor lead_mirror. */
+export function mirrorRow(lead: Lead) {
+  return {
     page_id: lead.id,
     type: lead.type,
     naam: lead.naam,
@@ -49,24 +48,30 @@ export async function reconcileLead(lead: Lead, prev: any | null): Promise<void>
     last_edited: lead.lastEdited,
     synced_at: new Date().toISOString(),
   };
+}
 
-  if (prev) {
-    const prevChecks = prev.checks || {};
-    const prevF = prev.f || {};
-    for (const key of funnel) {
-      if (lead.checks[key] && !prevChecks[key]) {
-        await logEvent(lead.id, lead.type, key as EventName, { source: 'notion-sync' });
-      }
-    }
-    for (const fk of ['f1', 'f2', 'f3'] as const) {
-      if ((lead.f as any)[fk] && !prevF[fk]) {
-        await logEvent(lead.id, lead.type, fk.toUpperCase() as EventName, { source: 'notion-sync' });
-      }
-    }
-    if (lead.status && lead.status !== prev.status) {
-      await logEvent(lead.id, lead.type, 'status', { value: lead.status, source: 'notion-sync' });
+/**
+ * Berekent (puur, zonder I/O) welke events er zijn t.o.v. de vorige spiegel:
+ * elke checkbox/F die false→true ging en elke status-wijziging. Op de eerste sync
+ * van een lead (geen prev) geen events: die historie ligt vóór de app.
+ */
+export function diffLeadEvents(lead: Lead, prev: any | null): EventRow[] {
+  if (!prev) return [];
+  const rows: EventRow[] = [];
+  const prevChecks = prev.checks || {};
+  const prevF = prev.f || {};
+  for (const key of funnelFor(lead.type)) {
+    if (lead.checks[key] && !prevChecks[key]) {
+      rows.push({ page_id: lead.id, type: lead.type, event: key, value: null, source: 'notion-sync' });
     }
   }
-
-  await sb.from('lead_mirror').upsert(mirrorRow, { onConflict: 'page_id' });
+  for (const fk of ['f1', 'f2', 'f3'] as const) {
+    if ((lead.f as any)[fk] && !prevF[fk]) {
+      rows.push({ page_id: lead.id, type: lead.type, event: fk.toUpperCase(), value: null, source: 'notion-sync' });
+    }
+  }
+  if (lead.status && lead.status !== prev.status) {
+    rows.push({ page_id: lead.id, type: lead.type, event: 'status', value: lead.status, source: 'notion-sync' });
+  }
+  return rows;
 }
