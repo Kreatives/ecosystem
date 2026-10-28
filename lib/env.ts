@@ -23,8 +23,13 @@ export const env = {
   deepApi: process.env.DEEPAPI_API_KEY || '',
 
   supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  // service-role key: alleen server-side, nooit naar de client.
-  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '',
+  // Secret key (nieuw: sb_secret_...), of de oude service-role-JWT. Alleen
+  // server-side, nooit naar de client. Negeert RLS, dus houd 'm geheim.
+  supabaseKey:
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_KEY ||
+    '',
 
   minScore: Number(process.env.MIN_SCORE || 6),
 };

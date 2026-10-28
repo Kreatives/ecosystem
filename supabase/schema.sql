@@ -92,3 +92,11 @@ create table if not exists scrape_runs (
   naar_notion int default 0,
   created_at  timestamptz not null default now()
 );
+
+-- De server praat met de secret key (role service_role). Nieuwe tabellen krijgen
+-- niet altijd automatisch de rechten; daarom expliciet toekennen.
+grant usage on schema public to service_role;
+grant all privileges on all tables in schema public to service_role;
+grant all privileges on all sequences in schema public to service_role;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
