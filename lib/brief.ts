@@ -8,7 +8,7 @@ export const CLIENT_NICHES = [
 ] as const;
 export const PARTNER_NICHES = ['Marketingbureau', 'SEO Agency', 'Overig'] as const;
 
-export type Source = 'linkedin' | 'instagram' | 'google-maps';
+export type Source = 'google-maps' | 'instagram';
 
 export type Plan = {
   samenvatting: string;
@@ -17,7 +17,6 @@ export type Plan = {
   regio: string;
   notionNiche: string;
   sources: Source[];
-  linkedinQuery: string;
   instagramTerms: string[];
   mapsTerms: string[];
   minVolgers?: number;
@@ -25,8 +24,11 @@ export type Plan = {
 };
 
 /**
- * Zet de vrije opdracht + gekozen type/platform om in een concreet zoekplan.
- * Platform bepaalt welke bronnen draaien; "beide" = LinkedIn + Instagram.
+ * Zet de vrije opdracht + type om in een zoekplan. Discovery loopt via de bronnen
+ * die een WEBSITE opleveren: Google Maps voor bedrijven (met een pand/website) en
+ * Instagram voor personal brands (website via de bio-link). LinkedIn is geen
+ * discovery-bron (levert geen site); het platform bepaalt alleen waar je straks
+ * benadert, en die outreach-link halen we van de site.
  */
 export async function interpreteerBrief(
   brief: string,
@@ -34,20 +36,17 @@ export async function interpreteerBrief(
   platform: 'linkedin' | 'instagram' | 'beide',
 ): Promise<Plan> {
   const niches = type === 'partner' ? PARTNER_NICHES : CLIENT_NICHES;
-  const sources: Source[] =
-    platform === 'linkedin' ? ['linkedin'] : platform === 'instagram' ? ['instagram'] : ['linkedin', 'instagram'];
 
   const partnerContext =
     type === 'partner'
-      ? 'LET OP: je zoekt STRATEGISCHE PARTNERS voor KREATIVES (marketingbureaus, sales-trainers, Google Ads-bureaus, CRM-leveranciers, accountants, fotografen, brandingstudio\'s) die zelf GEEN websites bouwen. Richt de zoektermen op dat soort bureaus en hun beslissers.'
-      : 'Je zoekt KLANTEN: B2B-dienstverleners en consultancybedrijven (5-30 medewerkers, 5+ jaar), sales-trainers, marketingadviseurs, recruitment/HR, organisatieadvies, B2B-opleiders. Solo-coaches mogen mee.';
+      ? 'Je zoekt STRATEGISCHE PARTNERS voor KREATIVES (marketingbureaus, sales-trainers, Google Ads-bureaus, CRM-leveranciers, accountants, fotografen, brandingstudio\'s) die zelf GEEN websites bouwen. Dit zijn bedrijven met een eigen website: gebruik vrijwel altijd Google Maps.'
+      : 'Je zoekt KLANTEN: B2B-dienstverleners en consultancybedrijven (5-30 medewerkers, 5+ jaar), sales-trainers, marketingadviseurs, recruitment/HR, organisatieadvies, B2B-opleiders. Dit zijn bedrijven met een eigen website en vaak een kantoor: gebruik Google Maps. Alleen bij pure personal brands/coaches gebruik je Instagram.';
 
-  const system = `Je bent de zoek-strateeg van KREATIVES, een Nederlands webdesignbureau. Je zet een vrije opdracht om in een concreet zoekplan. ${partnerContext}
+  const system = `Je bent de zoek-strateeg van KREATIVES, een Nederlands webdesignbureau. Je zet een vrije opdracht om in een concreet zoekplan dat leads mét een website oplevert. ${partnerContext}
 
-De gebruiker heeft deze bronnen gekozen: ${sources.join(', ')}. Vul alleen zoektermen in voor die bronnen.
-- linkedin: HEEL KORTE rol-zoekterm (2-3 woorden), bijv. "eigenaar adviesbureau".
-- instagram: 2-4 woorden zoals in de IG-zoekbalk, voeg vaak "nederland"/"nl"/een plaats toe.
-- google-maps: "vakterm plaats" (alleen als de opdracht duidelijk om lokale bedrijven met een pand vraagt).
+Kies per opdracht de beste bron(nen):
+- "google-maps": bedrijven met een pand en een website (adviesbureaus, consultants, bureaus, klinieken, dienstverleners). Zoektermen zijn "vakterm plaats", bijv. "organisatieadviesbureau Utrecht".
+- "instagram": alleen pure personal brands/coaches zonder kantoor. Zoektermen zijn 2-4 woorden zoals in de IG-zoekbalk, met "nederland"/"nl"/een plaats.
 
 De Niche moet exact een van deze zijn: ${niches.join(', ')}.
 
@@ -58,30 +57,28 @@ Antwoord UITSLUITEND met JSON:
   "omschrijving": string,        // 1-2 zinnen: wie is de ideale lead, voor de scoring
   "regio": string,               // regio/plaats indien genoemd, anders ""
   "notionNiche": string,         // exact een uit de lijst
-  "linkedinQuery": string,       // 2-3 woorden, leeg als linkedin geen bron is
-  "instagramTerms": string[],    // 3-6 termen, leeg als instagram geen bron is
-  "mapsTerms": string[],         // leeg tenzij google-maps zinvol is
+  "sources": string[],           // ["google-maps"] en/of ["instagram"]
+  "mapsTerms": string[],         // 5-10 "vakterm plaats"-termen, leeg als geen maps
+  "instagramTerms": string[],    // 3-6 termen, leeg als geen instagram
   "minVolgers": number | null,   // alleen bij instagram indien genoemd
-  "minReviews": number | null    // alleen bij maps indien genoemd
+  "minReviews": number | null    // alleen bij maps indien genoemd (meestal null; B2B heeft weinig reviews)
 }`;
 
   try {
-    const out = await ask(system, [{ type: 'text', text: `Opdracht: ${brief}` }], 900);
+    const out = await ask(system, [{ type: 'text', text: `Opdracht: ${brief}\nGekozen outreach-platform: ${platform}` }], 900);
     const j = JSON.parse(out);
     const notionNiche = (niches as readonly string[]).includes(j.notionNiche) ? j.notionNiche : 'Overig';
-    // google-maps alleen toevoegen als Claude er termen voor gaf
-    const finalSources = [...sources];
-    if (Array.isArray(j.mapsTerms) && j.mapsTerms.length && !finalSources.includes('google-maps')) {
-      finalSources.push('google-maps');
-    }
+    let sources: Source[] = Array.isArray(j.sources)
+      ? j.sources.filter((s: string) => s === 'google-maps' || s === 'instagram')
+      : [];
+    if (!sources.length) sources = ['google-maps'];
     return {
       samenvatting: j.samenvatting || '',
       label: j.label || 'Leads',
       omschrijving: j.omschrijving || brief,
       regio: j.regio || '',
       notionNiche,
-      sources: finalSources,
-      linkedinQuery: j.linkedinQuery || '',
+      sources,
       instagramTerms: Array.isArray(j.instagramTerms) ? j.instagramTerms.filter(Boolean) : [],
       mapsTerms: Array.isArray(j.mapsTerms) ? j.mapsTerms.filter(Boolean) : [],
       minVolgers: j.minVolgers ?? undefined,
@@ -94,10 +91,9 @@ Antwoord UITSLUITEND met JSON:
       omschrijving: brief,
       regio: '',
       notionNiche: 'Overig',
-      sources,
-      linkedinQuery: brief.split(/\s+/).slice(0, 3).join(' '),
+      sources: ['google-maps'],
       instagramTerms: [],
-      mapsTerms: [],
+      mapsTerms: [brief],
     };
   }
 }

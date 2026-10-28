@@ -1,6 +1,6 @@
 import type { DbType } from './env';
 import { interpreteerBrief } from './brief';
-import { scrapeLinkedinSearch, scrapeInstagramSearch, scrapeMaps, screenshot, type RawLead } from './apify';
+import { scrapeInstagramSearch, scrapeMaps, screenshot, type RawLead } from './apify';
 import { haalSite, haalDoorFilter } from './scrape-site';
 import { kwalificeerKlant, kwalificeerPartner, type QualifyResult } from './qualify';
 import { maakDedupeChecker, schrijfLead } from './notion-write';
@@ -39,15 +39,7 @@ export async function runPipeline(job: Job, input: RunInput): Promise<void> {
 
     for (const bron of plan.sources) {
       try {
-        if (bron === 'linkedin' && plan.linkedinQuery) {
-          emit(job, { kind: 'log', msg: `LinkedIn: "${plan.linkedinQuery}"${regio ? ` · ${regio}` : ''}` });
-          const batch = await scrapeLinkedinSearch({
-            searchQuery: regio ? `${plan.linkedinQuery} ${regio}` : plan.linkedinQuery,
-            locations: regio ? [regio] : ['Netherlands'],
-            maxItems,
-          });
-          raw.push(...batch);
-        } else if (bron === 'instagram' && plan.instagramTerms.length) {
+        if (bron === 'instagram' && plan.instagramTerms.length) {
           emit(job, { kind: 'log', msg: `Instagram: ${plan.instagramTerms.join(', ')}` });
           raw.push(...(await scrapeInstagramSearch(plan.instagramTerms, Math.max(5, Math.ceil(maxItems / plan.instagramTerms.length)))));
         } else if (bron === 'google-maps' && plan.mapsTerms.length) {
@@ -80,8 +72,10 @@ export async function runPipeline(job: Job, input: RunInput): Promise<void> {
     for (let i = 0; i < candidates.length && kept.length < aantal; i++) {
       const lead = candidates[i];
       try {
-        const site = lead.website ? await haalSite(lead.website) : { tekst: '', linkedin: '', ok: false };
+        const site = lead.website ? await haalSite(lead.website) : { tekst: '', linkedin: '', instagram: '', ok: false };
+        // Outreach-links van de site halen (de bron bij Maps-bedrijven).
         if (site.linkedin && !lead.linkedin) lead.linkedin = site.linkedin;
+        if (site.instagram && !lead.instagram) lead.instagram = site.instagram;
         const shot = lead.website ? await screenshot(lead.website) : '';
         const q =
           input.type === 'partner'
@@ -124,7 +118,7 @@ export async function runPipeline(job: Job, input: RunInput): Promise<void> {
     if (!input.dryRun) {
       for (let i = 0; i < kept.length; i++) {
         try {
-          await schrijfLead(input.type, kept[i].raw, kept[i].q);
+          await schrijfLead(input.type, kept[i].raw, kept[i].q, input.platform);
           summary.naarNotion++;
         } catch (e: any) {
           emit(job, { kind: 'leaderror', key: 'write', naam: kept[i].raw.naam, reden: e?.message || 'schrijf-fout' });

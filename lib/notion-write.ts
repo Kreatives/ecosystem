@@ -32,16 +32,23 @@ export async function maakDedupeChecker(type: DbType) {
   };
 }
 
-function outreachVoor(raw: RawLead): { url: string; platform: string } {
-  if (raw.linkedin) return { url: raw.linkedin, platform: 'LinkedIn' };
-  if (raw.instagram) return { url: raw.instagram, platform: 'Instagram' };
+function outreachVoor(raw: RawLead, voorkeur: 'linkedin' | 'instagram' | 'beide'): { url: string; platform: string } {
+  const li = { url: raw.linkedin || '', platform: 'LinkedIn' };
+  const ig = { url: raw.instagram || '', platform: 'Instagram' };
+  const volgorde = voorkeur === 'instagram' ? [ig, li] : [li, ig];
+  for (const o of volgorde) if (o.url) return o;
   return { url: '', platform: 'Google' };
 }
 
 /** Schrijft een gekwalificeerde lead naar de juiste Notion-database. */
-export async function schrijfLead(type: DbType, raw: RawLead, q: QualifyResult): Promise<string> {
+export async function schrijfLead(
+  type: DbType,
+  raw: RawLead,
+  q: QualifyResult,
+  platformVoorkeur: 'linkedin' | 'instagram' | 'beide' = 'beide',
+): Promise<string> {
   const P = propsFor(type);
-  const { url: outreach, platform } = outreachVoor(raw);
+  const { url: outreach, platform } = outreachVoor(raw, platformVoorkeur);
 
   const props: Record<string, any> = {
     [P.title]: { title: [{ text: { content: (raw.naam || 'Onbekend').slice(0, 190) } }] },

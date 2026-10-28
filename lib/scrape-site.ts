@@ -1,8 +1,8 @@
 import type { RawLead } from './apify';
 
-/** Haalt de homepage-tekst op zonder browser. Genoeg voor de meeste sites. */
-export async function haalSite(url: string): Promise<{ tekst: string; linkedin: string; ok: boolean }> {
-  const leeg = { tekst: '', linkedin: '', ok: false };
+/** Haalt de homepage-tekst op zonder browser, plus de LinkedIn/Instagram van de site. */
+export async function haalSite(url: string): Promise<{ tekst: string; linkedin: string; instagram: string; ok: boolean }> {
+  const leeg = { tekst: '', linkedin: '', instagram: '', ok: false };
   if (!url) return leeg;
   try {
     const res = await fetch(url, {
@@ -16,6 +16,7 @@ export async function haalSite(url: string): Promise<{ tekst: string; linkedin: 
     if (!res.ok) return leeg;
     const html = await res.text();
     const linkedin = (html.match(/https?:\/\/[a-z]{0,3}\.?linkedin\.com\/(in|company)\/[A-Za-z0-9\-_%]+/i) || [''])[0];
+    const instagram = (html.match(/https?:\/\/(www\.)?instagram\.com\/[A-Za-z0-9._]+/i) || [''])[0];
     const tekst = html
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -23,7 +24,7 @@ export async function haalSite(url: string): Promise<{ tekst: string; linkedin: 
       .replace(/&nbsp;/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    return { tekst, linkedin, ok: true };
+    return { tekst, linkedin, instagram, ok: true };
   } catch {
     return leeg;
   }
@@ -37,10 +38,12 @@ export function haalDoorFilter(
   const redenen: string[] = [];
 
   if (lead.bron === 'google-maps') {
-    const minReviews = opts.minReviews ?? 10;
+    // B2B-dienstverleners hebben vaak weinig Google-reviews; eis die niet standaard.
+    // De harde eis is een eigen website (die de qualifier nodig heeft).
+    const minReviews = opts.minReviews ?? 0;
     if (!lead.website) redenen.push('geen eigen website');
     if (/facebook\.com|instagram\.com|linktr\.ee/i.test(lead.website || '')) redenen.push('socialprofiel als website');
-    if ((lead.reviewAantal ?? 0) < minReviews) redenen.push(`minder dan ${minReviews} reviews`);
+    if (minReviews > 0 && (lead.reviewAantal ?? 0) < minReviews) redenen.push(`minder dan ${minReviews} reviews`);
   } else if (lead.bron === 'instagram') {
     const minVolgers = opts.minVolgers ?? 1000;
     if ((lead.volgers ?? 0) < minVolgers) redenen.push(`minder dan ${minVolgers} volgers`);
