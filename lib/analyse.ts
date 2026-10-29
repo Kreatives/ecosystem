@@ -14,11 +14,18 @@ export async function analyseerBasis(
   q: QualifyResult,
 ): Promise<Partial<QualifyResult>> {
   if (!siteTekst) return {};
-  const system = `Je analyseert de website van een lead voor KREATIVES (webdesignbureau). Noem concrete, controleerbare pijnpunten op basis van wat er echt op de site staat. Prioriteit: hero (vertrouwen + slogan), social proof, sectievolgorde, overtuigingskracht, verouderde uitstraling. Verzin niets; staat iets er niet, benoem het niet.
+  const system = `Je analyseert de website van een lead voor KREATIVES (webdesignbureau). Noem concrete, controleerbare pijnpunten op basis van wat er echt op de site staat. Verzin niets; staat iets er niet, benoem het niet.
+
+Geef 5 pijnpunten in deze prioriteitsvolgorde (contrast is geen prioriteit):
+1. hero (vertrouwen + slogan)
+2. social proof (aanwezig? juiste soort voor de niche?)
+3. sectievolgorde van boven naar beneden
+4. overtuigingskracht (staat er genoeg om iemand te overtuigen)
+5. uitstraling/verouderd
 
 Antwoord UITSLUITEND met JSON:
 {"pijnpunten": string[], "compliment": string}
-- pijnpunten: 3 korte punten, elk een observatie + de concrete consequentie voor de lead, in 1-2 zinnen, zodat het direct in een bericht past.
+- pijnpunten: precies 5 punten in bovenstaande volgorde, elk een observatie + de concrete consequentie voor de lead, in 1 of 2 korte zinnen, zodat het direct in een bericht past. Kort en to the point.
 - compliment: 1 echt, specifiek compliment over het bedrijf uit de site. Leeg als je niets echts vindt.
 Alles in het Nederlands, geen gedachtestreepjes, geen "geen X maar Y".`;
 

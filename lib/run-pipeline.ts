@@ -7,6 +7,7 @@ import { maakDedupeChecker, schrijfLead } from './notion-write';
 import { emit, type Job } from './jobs';
 import { analyseerBasis } from './analyse';
 import { ping } from './anthropic';
+import { schrijfBerichten } from './writer';
 
 export type RunInput = {
   brief: string;
@@ -113,20 +114,29 @@ export async function runPipeline(job: Job, input: RunInput): Promise<void> {
     }
     emit(job, { kind: 'step', key: 'analyse', state: 'done', counter: input.type === 'partner' ? 'n.v.t.' : `${kept.length} geanalyseerd` });
 
-    // ---------- 4. WRITE naar Notion ----------
+    // ---------- 4. WRITE: berichten schrijven + naar Notion ----------
     emit(job, { kind: 'step', key: 'write', state: 'active', counter: `0 / ${kept.length}` });
-    if (!input.dryRun) {
-      for (let i = 0; i < kept.length; i++) {
-        try {
-          await schrijfLead(input.type, kept[i].raw, kept[i].q, input.platform);
+    for (let i = 0; i < kept.length; i++) {
+      const k = kept[i];
+      try {
+        const berichten = await schrijfBerichten(
+          input.type,
+          k.raw,
+          k.site,
+          k.q.compliment || '',
+          k.q.pijnpunten || [],
+          input.platform,
+        );
+        if (!input.dryRun) {
+          await schrijfLead(input.type, k.raw, k.q, input.platform, berichten);
           summary.naarNotion++;
-        } catch (e: any) {
-          emit(job, { kind: 'leaderror', key: 'write', naam: kept[i].raw.naam, reden: e?.message || 'schrijf-fout' });
+        } else {
+          emit(job, { kind: 'log', msg: `Dry-run: ${berichten.items.length} berichten voor ${k.raw.naam} (niet weggeschreven).` });
         }
-        emit(job, { kind: 'step', key: 'write', state: 'active', counter: `${i + 1} / ${kept.length}` });
+      } catch (e: any) {
+        emit(job, { kind: 'leaderror', key: 'write', naam: k.raw.naam, reden: e?.message || 'schrijf-fout' });
       }
-    } else {
-      emit(job, { kind: 'log', msg: `Dry-run: ${kept.length} leads NIET naar Notion geschreven.` });
+      emit(job, { kind: 'step', key: 'write', state: 'active', counter: `${i + 1} / ${kept.length}` });
     }
     emit(job, { kind: 'step', key: 'write', state: 'done', counter: input.dryRun ? 'dry-run' : `${summary.naarNotion} naar Notion` });
 
