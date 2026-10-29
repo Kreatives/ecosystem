@@ -1,6 +1,8 @@
-import { ask } from './anthropic';
+import { ask, askJson } from './anthropic';
 import type { RawLead } from './apify';
 import type { QualifyResult } from './qualify';
+import { vindConcurrenten, type Concurrent } from './competitors';
+import { maakScreenshots } from './screenshots';
 
 /**
  * Basis-website-analyse zonder Deep API: drie concrete pijnpunten + een compliment,
@@ -43,4 +45,53 @@ Alles in het Nederlands, geen gedachtestreepjes, geen "geen X maar Y".`;
   } catch {
     return {};
   }
+}
+
+/** Loom-bullets (±3 min video): hero → sectievolgorde → social proof → wat verder
+ *  opvalt → hoe concurrent X het oplost. Alleen punten, geen script. */
+async function loomBullets(lead: RawLead, pijnpunten: string[], best?: Concurrent): Promise<string[]> {
+  const system = `Je maakt een bulletlijst voor een Loom-video van ±3 minuten over de website van een lead. Volgorde: hero → sectievolgorde → social proof → wat verder opvalt → hoe de concurrent het oplost. Alleen korte bullets, geen uitgeschreven script, geen gedachtestreepjes. Antwoord UITSLUITEND met JSON: {"bullets": string[]}`;
+  const user = `Bedrijf: ${lead.naam}\nPijnpunten:\n${pijnpunten.map((p, i) => `${i + 1}. ${p}`).join('\n')}\nBest passende concurrent: ${best ? `${best.naam} (${best.url}) — ${best.beter}` : 'onbekend'}`;
+  const j = await askJson<{ bullets: string[] }>(system, [{ type: 'text', text: user }], { bullets: [] }, 700);
+  return (j.bullets || []).filter(Boolean).slice(0, 8);
+}
+
+export type VolledigeAnalyse = {
+  pijnpunten: string[];
+  compliment: string;
+  concurrenten: Concurrent[];
+  loomBullets: string[];
+  screenshotDesktop: string;
+  screenshotMobiel: string;
+};
+
+/**
+ * De volledige website-analyse (fase 2): 5 pijnpunten + compliment, 3 NL + 3
+ * buitenlandse concurrenten (web search), Loom-bullets en screenshots
+ * (desktop + mobiel). Elk onderdeel is best-effort: faalt er één, dan gaat de
+ * rest door. Geen Deep API nodig.
+ */
+export async function analyseerVolledig(
+  lead: RawLead,
+  siteTekst: string,
+  q: QualifyResult,
+  niche: string,
+): Promise<VolledigeAnalyse> {
+  const basis = await analyseerBasis(lead, siteTekst, q);
+  const pijnpunten = basis.pijnpunten || q.pijnpunten || [];
+  const compliment = basis.compliment || q.compliment || '';
+
+  const concurrenten = lead.website ? await vindConcurrenten(lead, siteTekst, niche).catch(() => []) : [];
+  const best = concurrenten.find((c) => c.bestFit) || concurrenten[0];
+  const bullets = pijnpunten.length ? await loomBullets(lead, pijnpunten, best).catch(() => []) : [];
+  const shots = lead.website ? await maakScreenshots(lead.website, lead.naam).catch(() => ({ desktop: '', mobiel: '' })) : { desktop: '', mobiel: '' };
+
+  return {
+    pijnpunten,
+    compliment,
+    concurrenten,
+    loomBullets: bullets,
+    screenshotDesktop: shots.desktop,
+    screenshotMobiel: shots.mobiel,
+  };
 }

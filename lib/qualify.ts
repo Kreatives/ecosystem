@@ -8,7 +8,12 @@ export type QualifyResult = {
   skip: boolean; // true = weggooien (onder 6 of skip-regel)
   skipReden?: string;
   compliment?: string;
-  pijnpunten?: string[]; // basis-analyse (fase 2 = volledige analyse)
+  pijnpunten?: string[];
+  // volledige analyse (fase 2)
+  concurrenten?: import('./competitors').Concurrent[];
+  loomBullets?: string[];
+  screenshotDesktop?: string;
+  screenshotMobiel?: string;
 };
 
 /**

@@ -5,9 +5,10 @@ import { haalSite, haalDoorFilter } from './scrape-site';
 import { kwalificeerKlant, kwalificeerPartner, type QualifyResult } from './qualify';
 import { maakDedupeChecker, schrijfLead } from './notion-write';
 import { emit, type Job } from './jobs';
-import { analyseerBasis } from './analyse';
+import { analyseerVolledig } from './analyse';
 import { ping } from './anthropic';
 import { schrijfBerichten } from './writer';
+import { supabase } from './supabase';
 
 export type RunInput = {
   brief: string;
@@ -100,12 +101,16 @@ export async function runPipeline(job: Job, input: RunInput): Promise<void> {
     summary.gekwalificeerd = door;
     emit(job, { kind: 'step', key: 'qualify', state: 'done', counter: `${door} door, ${weg} weggegooid` });
 
-    // ---------- 3. ANALYSE (basis; volledige analyse + concurrenten = fase 2, Deep API) ----------
+    // ---------- 3. ANALYSE: volledige website-analyse (pijnpunten, concurrenten, Loom, screenshots) ----------
     emit(job, { kind: 'step', key: 'analyse', state: 'active', counter: input.type === 'partner' ? 'n.v.t. voor partners' : `0 / ${kept.length}` });
     if (input.type === 'client') {
       for (let i = 0; i < kept.length; i++) {
         try {
-          if (kept[i].site) kept[i].q = { ...kept[i].q, ...(await analyseerBasis(kept[i].raw, kept[i].site, kept[i].q)) };
+          if (kept[i].site || kept[i].raw.website) {
+            const a = await analyseerVolledig(kept[i].raw, kept[i].site, kept[i].q, plan.notionNiche);
+            kept[i].q = { ...kept[i].q, ...a };
+            emit(job, { kind: 'log', msg: `${kept[i].raw.naam}: ${a.concurrenten.length} concurrenten, ${a.screenshotDesktop ? 'screenshots ✓' : 'geen screenshots'}` });
+          }
         } catch (e: any) {
           emit(job, { kind: 'leaderror', key: 'analyse', naam: kept[i].raw.naam, reden: e?.message || 'analyse-fout' });
         }
@@ -128,8 +133,22 @@ export async function runPipeline(job: Job, input: RunInput): Promise<void> {
           input.platform,
         );
         if (!input.dryRun) {
-          await schrijfLead(input.type, k.raw, k.q, input.platform, berichten);
+          const pageId = await schrijfLead(input.type, k.raw, k.q, input.platform, berichten);
           summary.naarNotion++;
+          // analyse-output spiegelen naar de eigen database (fase 6 gebruikt dit).
+          const sb = supabase();
+          if (sb) {
+            sb.from('analyses').upsert({
+              page_id: pageId,
+              pijnpunten: k.q.pijnpunten || null,
+              compliment: k.q.compliment || null,
+              concurrenten: k.q.concurrenten || null,
+              loom_bullets: k.q.loomBullets || null,
+              screenshot_desktop: k.q.screenshotDesktop || null,
+              screenshot_mobiel: k.q.screenshotMobiel || null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'page_id' }).then(() => {}, () => {});
+          }
         } else {
           emit(job, { kind: 'log', msg: `Dry-run: ${berichten.items.length} berichten voor ${k.raw.naam} (niet weggeschreven).` });
         }

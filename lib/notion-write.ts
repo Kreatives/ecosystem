@@ -4,7 +4,7 @@ import { propsFor } from './notion-schema';
 import type { RawLead } from './apify';
 import type { QualifyResult } from './qualify';
 import type { Berichten } from './writer';
-import { h2, h3, para, bullet, divider, callout } from './notion-blocks';
+import { h2, h3, para, bullet, divider, callout, image } from './notion-blocks';
 
 const normDomein = (website: string) =>
   (website || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0].toLowerCase();
@@ -82,19 +82,47 @@ export function leadBlocks(type: DbType, raw: RawLead, q: QualifyResult, bericht
     }
   }
 
-  // 3) Loom-bullets / 4) Concurrenten (fase 2, Deep API)
-  children.push(divider());
-  children.push(h2('Loom-bullets & concurrenten'));
-  children.push(para('Volgt in fase 2 (volledige website-analyse met Deep API): 5 geprioriteerde pijnpunten, 3 NL + 3 buitenlandse concurrenten met aanvalszin, en de Loom-bulletlijst.'));
+  // 3) Loom-bullets
+  if (q.loomBullets?.length) {
+    children.push(divider());
+    children.push(h2('Loom-bullets (±3 min)'));
+    for (const b of q.loomBullets) children.push(bullet(b));
+  }
 
-  // 5) Pijnpunten (basis)
+  // 4) Concurrenten
+  if (q.concurrenten?.length) {
+    children.push(divider());
+    children.push(h2('Concurrenten'));
+    for (const c of q.concurrenten) {
+      children.push(h3(`${c.bestFit ? '★ ' : ''}${c.naam} · ${c.land}`));
+      if (c.url) children.push(para(c.url));
+      if (c.beter) children.push(bullet(`**Beter:** ${c.beter}`));
+      if (c.zwakker) children.push(bullet(`**Zwakker:** ${c.zwakker}`));
+      if (c.aanvalszin) children.push(bullet(`**Aanvalszin:** ${c.aanvalszin}`));
+    }
+  }
+
+  // 5) Pijnpunten (volledig)
   if (q.pijnpunten?.length) {
     children.push(divider());
-    children.push(h2('Pijnpunten (basis-analyse)'));
+    children.push(h2('Pijnpunten'));
     for (const p of q.pijnpunten) children.push(bullet(p));
   }
 
-  // 6) Contact + screenshots
+  // 6) Screenshots
+  if (q.screenshotDesktop || q.screenshotMobiel) {
+    children.push(divider());
+    children.push(h2('Screenshots'));
+    if (q.screenshotDesktop) {
+      children.push(h3('Desktop'));
+      children.push(image(q.screenshotDesktop));
+    }
+    if (q.screenshotMobiel) {
+      children.push(h3('Mobiel'));
+      children.push(image(q.screenshotMobiel));
+    }
+  }
+
   if (raw.contactpersoon) {
     children.push(divider());
     children.push(h3('Contactpersoon'));

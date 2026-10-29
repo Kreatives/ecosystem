@@ -7,9 +7,10 @@
  */
 import { notion } from '../lib/notion';
 import { haalSite } from '../lib/scrape-site';
-import { analyseerBasis } from '../lib/analyse';
+import { analyseerVolledig } from '../lib/analyse';
 import { schrijfBerichten } from '../lib/writer';
 import { leadBlocks } from '../lib/notion-write';
+import { supabase } from '../lib/supabase';
 import type { RawLead } from '../lib/apify';
 
 const titleText = (p: any) => (p?.title || []).map((t: any) => t.plain_text).join('').trim();
@@ -34,14 +35,25 @@ async function reformat(pageId: string) {
     if (/PROFIELFIT|KOOPSIGNALEN|WEBSITE/i.test(txt) && txt.length > onderbouwing.length) onderbouwing = txt;
   }
 
-  console.log(`\n→ ${naam} (score ${score})`);
+  console.log(`\n→ ${naam} (score ${score}) — analyseren…`);
   const site = website ? await haalSite(website) : { tekst: '', linkedin: '', instagram: '', ok: false };
   const raw: RawLead = { naam, website, bron: 'google-maps' };
-  const a = await analyseerBasis(raw, site.tekst, { score, onderbouwing, niche, skip: false });
-  const berichten = await schrijfBerichten('client', raw, site.tekst, a.compliment || '', a.pijnpunten || [], platform as any);
+  const a = await analyseerVolledig(raw, site.tekst, { score, onderbouwing, niche, skip: false }, niche);
+  const berichten = await schrijfBerichten('client', raw, site.tekst, a.compliment, a.pijnpunten, platform as any);
 
-  const q = { score, onderbouwing, niche, skip: false, compliment: a.compliment, pijnpunten: a.pijnpunten };
+  const q = {
+    score, onderbouwing, niche, skip: false,
+    compliment: a.compliment, pijnpunten: a.pijnpunten,
+    concurrenten: a.concurrenten, loomBullets: a.loomBullets,
+    screenshotDesktop: a.screenshotDesktop, screenshotMobiel: a.screenshotMobiel,
+  };
   const blocks = leadBlocks('client', raw, q, berichten);
+  const sb = supabase();
+  if (sb) await sb.from('analyses').upsert({
+    page_id: pageId, pijnpunten: a.pijnpunten, compliment: a.compliment, concurrenten: a.concurrenten,
+    loom_bullets: a.loomBullets, screenshot_desktop: a.screenshotDesktop, screenshot_mobiel: a.screenshotMobiel,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'page_id' });
 
   // oude blokken archiveren, nieuwe toevoegen
   for (const b of kids.results) {

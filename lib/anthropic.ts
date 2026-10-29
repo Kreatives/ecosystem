@@ -47,3 +47,21 @@ export async function askJson<T>(system: string, content: any[], fallback: T, ma
     return fallback;
   }
 }
+
+/** Claude met ingebouwde web search. Geeft de samengevoegde tekst van de
+ *  antwoord-blokken terug (de tool-resultaten zitten ertussen). */
+export async function askWeb(system: string, userText: string, maxUses = 4, maxTokens = 2500): Promise<string> {
+  const res = await client().messages.create({
+    model: MODEL,
+    max_tokens: maxTokens,
+    system,
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxUses }] as any,
+    messages: [{ role: 'user', content: userText }],
+  });
+  return res.content
+    .filter((c: any) => c.type === 'text')
+    .map((c: any) => c.text)
+    .join('\n')
+    .replace(/```json|```/g, '')
+    .trim();
+}
