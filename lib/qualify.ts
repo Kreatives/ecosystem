@@ -45,7 +45,7 @@ SKIP-REGELS (dan score < 6 en skip = true):
 Verzin nooit feiten. Wat je niet ziet is onbekend; scoor dan conservatief. Antwoord UITSLUITEND met JSON:
 {"score": number, "onderbouwing": string, "compliment": string, "skip": boolean, "skipReden": string}
 - onderbouwing: 3 tot 5 regels met concrete, controleerbare observaties (bouwjaar footer, aantal medewerkers, staat van de site, vacature). Benoem per deel kort de score.
-- compliment: 1 echt, specifiek compliment over het bedrijf uit de site. Leeg als je niets echts vindt.
+- compliment: 1 echt compliment over het BEDRIJF zelf (sinds wanneer actief, bekende klanten, specialismen, eigen aanpak), nooit over de website of de teksten. Leeg als je niets echts vindt.
 - skip: true alleen bij een skip-regel of score < 6. skipReden: 1 zin, anders leeg.
 Alles in het Nederlands.`;
 

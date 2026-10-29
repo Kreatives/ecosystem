@@ -16,20 +16,15 @@ export async function analyseerBasis(
   q: QualifyResult,
 ): Promise<Partial<QualifyResult>> {
   if (!siteTekst) return {};
-  const system = `Je analyseert de website van een lead voor KREATIVES (webdesignbureau). Noem concrete, controleerbare pijnpunten op basis van wat er echt op de site staat. Verzin niets; staat iets er niet, benoem het niet.
+  const system = `Je analyseert de website van een lead voor KREATIVES (webdesignbureau). De kern van de boodschap is altijd: dit bedrijf is goed, maar de website laat dat niet zien. Verzin niets; staat iets er niet, benoem het niet.
 
-Geef 5 pijnpunten in deze prioriteitsvolgorde (contrast is geen prioriteit):
-1. hero (vertrouwen + slogan)
-2. social proof (aanwezig? juiste soort voor de niche?)
-3. sectievolgorde van boven naar beneden
-4. overtuigingskracht (staat er genoeg om iemand te overtuigen)
-5. uitstraling/verouderd
+COMPLIMENT: één echt, concreet compliment over het BEDRIJF zelf, NOOIT over de website, de teksten of de opbouw. Gebruik feiten: sinds welk jaar ze bestaan, bekende klanten of merken waarvoor ze werken, specialismen, teamomvang, awards, mooie klantverhalen of een duidelijke eigen aanpak. Voorbeeldstijl: "Ik zag dat je al sinds 2010 werkt voor merken als Albert Heijn, Heineken en Jumbo." Leeg laten als je niets echts over het bedrijf vindt.
+
+PIJNPUNTEN: precies 5, in deze prioriteitsvolgorde: 1) hero (vertrouwen + slogan), 2) social proof, 3) sectievolgorde, 4) overtuigingskracht, 5) uitstraling/verouderd. Elk punt is een concrete observatie over de SITE plus de consequentie. Zet waar het kan een echt sterk punt van het bedrijf tegenover de zwakte van de site, in de geest van: "jullie [sterk punt], maar de site laat dat niet zien, waardoor [consequentie]". Kort, 1 of 2 zinnen, direct bruikbaar in een bericht.
 
 Antwoord UITSLUITEND met JSON:
 {"pijnpunten": string[], "compliment": string}
-- pijnpunten: precies 5 punten in bovenstaande volgorde, elk een observatie + de concrete consequentie voor de lead, in 1 of 2 korte zinnen, zodat het direct in een bericht past. Kort en to the point.
-- compliment: 1 echt, specifiek compliment over het bedrijf uit de site. Leeg als je niets echts vindt.
-Alles in het Nederlands, geen gedachtestreepjes, geen "geen X maar Y".`;
+Alles in het Nederlands, geen gedachtestreepjes, geen "geen X maar Y", geen bureautaal.`;
 
   try {
     const out = await ask(
