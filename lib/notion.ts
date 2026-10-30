@@ -91,6 +91,30 @@ export async function getLead(type: DbType, pageId: string): Promise<Lead> {
   return pageToLead(type, page);
 }
 
+const blockText = (b: any): string => {
+  const t = b?.[b.type];
+  return (t?.rich_text || []).map((x: any) => x.plain_text).join('');
+};
+
+/** Haalt de tekst van het bericht onder een kop (bijv. "Day 2 — variant 1") uit
+ *  de leadpagina. Geeft lege string als het er niet staat. */
+export async function getBericht(pageId: string, labelPrefix: string): Promise<string> {
+  try {
+    const res: any = await notion().blocks.children.list({ block_id: pageId, page_size: 100 });
+    const blocks = res.results as any[];
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      if (b.type === 'heading_3' && blockText(b).startsWith(labelPrefix)) {
+        const next = blocks[i + 1];
+        if (next && (next.type === 'callout' || next.type === 'paragraph')) return blockText(next);
+      }
+    }
+  } catch {
+    /* pagina onleesbaar */
+  }
+  return '';
+}
+
 /** Canonieke patch die de app naar een leadpagina schrijft. */
 export type LeadPatch = {
   status?: StatusValue;

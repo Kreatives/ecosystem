@@ -160,6 +160,22 @@ export async function runPipeline(job: Job, input: RunInput): Promise<void> {
     emit(job, { kind: 'step', key: 'write', state: 'done', counter: input.dryRun ? 'dry-run' : `${summary.naarNotion} naar Notion` });
 
     summary.seconden = Math.round((Date.now() - t0) / 1000);
+
+    // Run loggen voor de statistieken (gescrapet/gekwalificeerd per week).
+    const sb = supabase();
+    if (sb && !input.dryRun) {
+      sb.from('scrape_runs').insert({
+        id: job.id,
+        prompt: input.brief,
+        type: input.type,
+        platform: input.platform,
+        gevonden: summary.gevonden,
+        gekwalificeerd: summary.gekwalificeerd,
+        weggegooid: summary.weggegooid,
+        naar_notion: summary.naarNotion,
+      }).then(() => {}, () => {});
+    }
+
     emit(job, { kind: 'done', summary });
   } catch (e: any) {
     emit(job, { kind: 'error', msg: e?.message || 'onbekende fout' });

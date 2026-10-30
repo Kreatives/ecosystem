@@ -360,3 +360,33 @@ button { font-family: inherit; }
   max-width: 760px;
 }
 .run-summary strong { color: var(--ink); font-weight: 600; }
+
+/* ---------- Vandaag ---------- */
+.fu-cols { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: var(--s-6); align-items: start; }
+.fu-col { display: flex; flex-direction: column; gap: var(--s-3); }
+.fu-coltitle { font-size: var(--text-sm); font-weight: 600; color: var(--ink); margin: 0 0 var(--s-1); display: flex; gap: var(--s-2); align-items: center; }
+.fu-coltitle span { font-size: var(--text-xs); color: var(--faint); font-weight: 400; }
+.fu-card { border: 1px solid var(--line); background: var(--panel); border-radius: var(--radius); padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.fu-slim { padding: var(--s-3) var(--s-4); gap: var(--s-2); }
+.fu-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-3); }
+.fu-name { font-size: var(--text-sm); font-weight: 500; display: block; }
+.fu-meta { font-size: var(--text-xs); color: var(--faint); }
+.fu-why { font-size: var(--text-xs); color: var(--muted); }
+.fu-msg { display: flex; flex-direction: column; gap: var(--s-2); }
+.fu-msg pre { margin: 0; padding: var(--s-3); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: var(--text-sm); white-space: pre-wrap; line-height: 1.5; color: var(--ink); }
+.fu-actions { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+
+/* ---------- Statistieken ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--s-3); }
+.stat-cell { border: 1px solid var(--line); background: var(--panel); border-radius: var(--radius); padding: var(--s-4); }
+.stat-num { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; }
+.stat-lbl { font-size: var(--text-xs); color: var(--muted); margin-top: var(--s-1); }
+.conv-row { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.conv-pill { font-size: var(--text-xs); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px var(--s-3); }
+.conv-pill strong { color: var(--ink); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.stat-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.stat-table th, .stat-table td { padding: var(--s-2) var(--s-3); text-align: right; border-bottom: 1px solid var(--line); }
+.stat-table th:first-child, .stat-table td:first-child { text-align: left; color: var(--muted); }
+.stat-table thead th { font-weight: 500; color: var(--muted); font-size: var(--text-xs); }
+.stat-table tbody tr:last-child td { border-bottom: none; }
