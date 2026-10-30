@@ -115,6 +115,11 @@ export async function getBericht(pageId: string, labelPrefix: string): Promise<s
   return '';
 }
 
+/** Archiveert een leadpagina in Notion (= verwijderen; blijft 30 dagen in de prullenbak). */
+export async function verwijderLead(pageId: string): Promise<void> {
+  await notion().pages.update({ page_id: pageId, archived: true });
+}
+
 /** Canonieke patch die de app naar een leadpagina schrijft. */
 export type LeadPatch = {
   status?: StatusValue;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
+import { Assistant } from "@/components/Assistant";
 
 const interTight = Inter_Tight({
   subsets: ["latin"],
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="app">
           <Sidebar />
           <main className="main">{children}</main>
+          <Assistant />
         </div>
       </body>
     </html>
