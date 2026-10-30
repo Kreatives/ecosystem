@@ -56,13 +56,6 @@ export function Assistant() {
             {msgs.map((m, i) => (
               <div key={i} className={`asst-msg ${m.role}`}>
                 <div className="asst-bubble">{m.content}</div>
-                {m.acties && m.acties.length > 0 && (
-                  <div className="asst-acties">
-                    {m.acties.map((a, j) => (
-                      <span key={j} className="asst-actie">{a.tool}: {a.resultaat}</span>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
             {busy && <div className="asst-msg assistant"><div className="asst-bubble asst-typing">bezig…</div></div>}
