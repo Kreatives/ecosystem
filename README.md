@@ -5,15 +5,22 @@ analyseren, de volledige outreach-sequence klaarschrijven en alles tracken. **De
 verstuurt nooit iets** — Ricky verstuurt elk bericht zelf. Notion is de bron van waarheid.
 
 Stack: Next.js (App Router) + TypeScript + Tailwind, Supabase/Postgres voor het
-event-log en jobs, Anthropic (Claude), Apify + Deep API voor scrapen/research,
-Playwright voor screenshots. Draait lokaal en op Vercel.
+event-log/jobs/analyse, Anthropic (Claude, incl. ingebouwde web search voor
+concurrenten), Apify voor scrapen, Playwright voor screenshots. Draait lokaal en op Vercel.
 
-## Status per fase
+## Status per fase — alles klaar
 
-- **Fase 1 — klaar.** Notion-koppeling (beide databases), eigen DB-schema + event-log,
-  tweerichtings-Kanban, follow-up-engine (Date/Status/F1–F3), tellingen die kloppen.
-- Fase 2 (website-analist), 3 (outreach writer), 4 (qualifier), 5 (scraper-pipeline),
-  6 (dagoverzicht + statistieken), 7 (deploy) volgen.
+- **1** Notion-koppeling (beide DB's), eigen DB + event-log, tweerichtings-Kanban, follow-up-engine.
+- **2** Website-analist: compliment over het bedrijf, 5 pijnpunten, 3 NL + 3 buitenlandse
+  concurrenten (Claude web search), Loom-bullets, screenshots (desktop + mobiel).
+- **3** Outreach-writer: volledige sequence per `flow-klant.md` / `flow-partner.md`, nette opmaak.
+- **4** Qualifier 40/30/30 (ICP) + partner-qualifier, met skip-regels.
+- **5** Scraper (Apify, Google Maps voor bedrijven + Instagram voor personal brands),
+  prompt-gestuurd, live run-scherm met voortgang.
+- **6** Dagoverzicht ("Vandaag") met kopieerknop + acties, en statistieken (funnel + weektrend).
+- **7** Vercel-klaar (deze README).
+
+Deep API bleek niet nodig: concurrenten lopen via Claude's web search, screenshots via Playwright.
 
 ## Lokaal draaien
 
@@ -23,37 +30,62 @@ cp .env.example .env.local   # vul de sleutels in (zie hieronder)
 npm run dev                  # http://localhost:3000
 ```
 
-`.env.local` is lokaal al gevuld met de Notion/Apify/Anthropic-sleutels uit de bestaande
-lead-scraper. Vul `DEEPAPI_API_KEY` en de Supabase-sleutels aan wanneer je die hebt.
+### Sleutels (dezelfde lokaal én op Vercel)
 
-### Sleutels
+| Variabele | Nodig voor |
+|---|---|
+| `NOTION_TOKEN` | alles |
+| `NOTION_CLIENTS_DATABASE_ID` | Clients-DB |
+| `NOTION_PARTNER_DATABASE_ID` | Partners-DB |
+| `ANTHROPIC_API_KEY` | qualifier, analyse, writer, concurrenten (web search) |
+| `APIFY_TOKEN` | scrapen (Google Maps / Instagram) |
+| `SUPABASE_URL` + `SUPABASE_SECRET_KEY` | event-log, statistieken, analyse-opslag, screenshots |
+| `MIN_SCORE` | drempel (standaard 6) |
 
-| Variabele | Nodig voor | Status |
-|---|---|---|
-| `NOTION_TOKEN` | alles | ✅ ingevuld |
-| `NOTION_CLIENTS_DATABASE_ID` | Clients-DB | ✅ |
-| `NOTION_PARTNER_DATABASE_ID` | Partners-DB | ✅ |
-| `ANTHROPIC_API_KEY` | qualifier, analyse, writer | ✅ |
-| `APIFY_TOKEN` | scrapen (LinkedIn/Maps/IG) | ✅ |
-| `DEEPAPI_API_KEY` | website-analyse, concurrenten, verrijking | ⛔ nog invullen |
-| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | event-log, statistieken | ⛔ nog invullen |
+`DEEPAPI_API_KEY` is **niet** nodig. De Kanban en sync werken ook zonder Supabase; dan
+worden alleen het event-log en de statistieken nog niet bijgehouden.
 
-De Kanban en de sync werken **zonder** Supabase. Zonder Supabase wordt alleen het
-event-log (verstuurdatums voor de statistieken) nog niet bijgehouden.
+## Een run starten
+
+1. Ga naar **Nieuwe run**.
+2. Beschrijf wie je zoekt (bv. "organisatieadviesbureaus in Utrecht met 5–30 medewerkers"),
+   kies aantal, type (Klant/Partner) en platform. Zet eventueel **Testrun** aan (schrijft niets).
+3. **Start run** → je ziet live: scrapen → kwalificeren → analyseren → berichten schrijven.
+   Gekwalificeerde leads (6+) komen in Notion met score, onderbouwing, concurrenten,
+   Loom-bullets, screenshots en de volledige berichten-sequence.
+4. Daarna werk je via **Kanban** (sleep tussen kolommen) en **Vandaag** (kopieer het bericht
+   dat nu klaarstaat, klik "verstuurd" nadat je het zelf hebt gestuurd).
 
 ## Supabase instellen (stappenplan)
 
-1. Maak een project op [supabase.com](https://supabase.com) → **New project**. Kies een
-   regio in de EU (Frankfurt). Bewaar het database-wachtwoord.
-2. Open in het project **SQL Editor** → **New query**, plak de inhoud van
-   [`supabase/schema.sql`](supabase/schema.sql) en klik **Run**. Dit maakt de tabellen
-   `lead_mirror`, `events`, `sync_runs`, `jobs`, `job_logs`, `analyses`, `scrape_runs`.
-3. Ga naar **Project Settings → API**. Kopieer:
-   - **Project URL** → `SUPABASE_URL`
-   - **service_role** secret (onder Project API keys) → `SUPABASE_SERVICE_ROLE_KEY`
-     (alleen server-side, nooit naar de browser).
-4. Zet beide in `.env.local` (lokaal) en later in de Vercel-projectinstellingen.
-5. Herstart `npm run dev`. Vanaf nu vult elke actie en elke sync het event-log.
+1. Maak een project op [supabase.com](https://supabase.com) → **New project** (regio EU/Frankfurt).
+2. **SQL Editor** → **New query** → plak [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
+   Dit maakt de tabellen én de rechten voor de secret key.
+3. **Project Settings → API Keys** → kopieer de **secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY`,
+   en **Project URL** → `SUPABASE_URL`.
+4. **Storage** → maak een **public** bucket `screenshots` (of hij wordt automatisch gemaakt bij
+   de eerste run als de rechten kloppen).
+5. Zet beide waarden in `.env.local` en in de Vercel-projectinstellingen. Herstart `npm run dev`.
+
+## Deploy op Vercel
+
+De repo staat op GitHub ([Kreatives/ecosystem](https://github.com/Kreatives/ecosystem)).
+
+1. [vercel.com](https://vercel.com) → **Add New… → Project** → importeer de repo. Framework
+   (Next.js) wordt automatisch herkend.
+2. Zet onder **Settings → Environment Variables** alle sleutels uit de tabel hierboven
+   (dezelfde als `.env.local`). `DEEPAPI_API_KEY` is niet nodig.
+3. **Deploy.** Dat is alles.
+
+Details die al goed staan:
+- Screenshots draaien op Vercel via `@sparticuz/chromium` (automatisch herkend aan de
+  `VERCEL`-omgeving); lokaal via de volledige Playwright-installatie.
+- De run draait als één streaming-request (`/api/run/stream`, `maxDuration` 300s), dus er is
+  geen aparte worker nodig. `vercel.json` geeft die functie 2 GB geheugen voor Chromium.
+- **Grote runs kun je het best lokaal draaien** (`npm run dev`, geen tijdslimiet). Op Vercel
+  moet een run binnen ~300s klaar zijn; de volledige analyse kost ~1 min per lead, dus houd het
+  aantal per run bescheiden (±3–5). Wordt de limiet gehaald, dan schrijft die run niets weg —
+  draai 'm dan lokaal of kleiner. De Kanban, Vandaag en statistieken hebben deze limiet niet.
 
 ## Wat Ricky in Notion doet
 

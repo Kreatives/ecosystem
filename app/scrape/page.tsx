@@ -46,15 +46,14 @@ export default function ScrapePage() {
     setSteps(initialSteps());
     setRunning(true);
     try {
-      const res = await fetch("/api/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief: prompt, aantal, type, platform, dryRun }),
+      const qs = new URLSearchParams({
+        brief: prompt,
+        aantal: String(aantal),
+        type,
+        platform,
+        dryRun: dryRun ? "1" : "0",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Starten mislukt");
-
-      const es = new EventSource(`/api/run/${data.jobId}/events`);
+      const es = new EventSource(`/api/run/stream?${qs}`);
       esRef.current = es;
       es.onmessage = (ev) => {
         const e = JSON.parse(ev.data);

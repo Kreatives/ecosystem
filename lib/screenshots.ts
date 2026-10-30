@@ -16,8 +16,7 @@ export async function maakScreenshots(
 
   let browser: any;
   try {
-    const { chromium } = await import('playwright');
-    browser = await chromium.launch();
+    browser = await launchBrowser();
     const out: { desktop: string; mobiel: string } = { desktop: '', mobiel: '' };
     const varianten: ['desktop' | 'mobiel', { width: number; height: number }][] = [
       ['desktop', { width: 1440, height: 900 }],
@@ -48,6 +47,23 @@ export async function maakScreenshots(
       /* al dicht */
     }
   }
+}
+
+/** Start een browser: op Vercel via @sparticuz/chromium + playwright-core,
+ *  lokaal via de volledige playwright-installatie. */
+async function launchBrowser(): Promise<any> {
+  const opVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (opVercel) {
+    const chromium = (await import('@sparticuz/chromium')).default as any;
+    const { chromium: pw } = await import('playwright-core');
+    return pw.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    });
+  }
+  const { chromium } = await import('playwright');
+  return chromium.launch();
 }
 
 async function upload(path: string, buf: Buffer): Promise<string> {
