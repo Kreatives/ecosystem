@@ -76,7 +76,9 @@ export async function analyseerVolledig(
   const pijnpunten = basis.pijnpunten || q.pijnpunten || [];
   const compliment = basis.compliment || q.compliment || '';
 
-  const concurrenten = lead.website ? await vindConcurrenten(lead, siteTekst, niche).catch(() => []) : [];
+  // Concurrenten (web search) is de duurste stap. Uit te zetten met ANALYSE_CONCURRENTEN=0.
+  const doeConcurrenten = process.env.ANALYSE_CONCURRENTEN !== '0';
+  const concurrenten = doeConcurrenten && lead.website ? await vindConcurrenten(lead, siteTekst, niche).catch(() => []) : [];
   const best = concurrenten.find((c) => c.bestFit) || concurrenten[0];
   const bullets = pijnpunten.length ? await loomBullets(lead, pijnpunten, best).catch(() => []) : [];
   const shots = lead.website ? await maakScreenshots(lead.website, lead.naam).catch(() => ({ desktop: '', mobiel: '' })) : { desktop: '', mobiel: '' };

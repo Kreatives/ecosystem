@@ -8,8 +8,8 @@ function client(): Anthropic {
   return _client;
 }
 
-// Sonnet voor het bulk-werk (brief + kwalificeren). Goedkoop genoeg per lead.
-export const MODEL = 'claude-sonnet-4-6';
+// Sonnet voor het bulk-werk. Via ANTHROPIC_MODEL te overriden (bv. Haiku = veel goedkoper).
+export const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 /** Herprobeert bij rate limits / overbelasting met exponentiële backoff. */
 async function withRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {

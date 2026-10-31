@@ -39,6 +39,11 @@ export async function reformat(pageId: string) {
   const site = website ? await haalSite(website) : { tekst: '', linkedin: '', instagram: '', ok: false };
   const raw: RawLead = { naam, website, bron: 'google-maps' };
   const a = await analyseerVolledig(raw, site.tekst, { score, onderbouwing, niche, skip: false }, niche);
+  // Lege analyse (geen leesbare site-inhoud of rate limit) → niet met kale placeholders
+  // wegschrijven, maar als fout markeren zodat de lead opnieuw gedaan kan worden.
+  if (!a.pijnpunten.length && !a.compliment) {
+    throw new Error('lege analyse (geen site-inhoud of rate limit) — niet weggeschreven');
+  }
   const berichten = await schrijfBerichten('client', raw, site.tekst, a.compliment, a.pijnpunten, platform as any);
 
   const q = {
