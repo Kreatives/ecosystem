@@ -11,14 +11,35 @@ function client(): Anthropic {
 // Sonnet voor het bulk-werk (brief + kwalificeren). Goedkoop genoeg per lead.
 export const MODEL = 'claude-sonnet-4-6';
 
+/** Herprobeert bij rate limits / overbelasting met exponentiële backoff. */
+async function withRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {
+  let last: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      last = e;
+      const s = e?.status;
+      if ((s === 429 || s === 529 || s === 500 || s === 503) && i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, Math.min(30000, 1500 * 2 ** i)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw last;
+}
+
 /** Eén call naar Claude. Geeft platte tekst terug, met ```json-fences gestript. */
 export async function ask(system: string, content: any[], maxTokens = 1500): Promise<string> {
-  const res = await client().messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: 'user', content }],
-  });
+  const res = await withRetry(() =>
+    client().messages.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content }],
+    }),
+  );
   const text = res.content
     .filter((c: any) => c.type === 'text')
     .map((c: any) => c.text)
@@ -51,13 +72,15 @@ export async function askJson<T>(system: string, content: any[], fallback: T, ma
 /** Claude met ingebouwde web search. Geeft de samengevoegde tekst van de
  *  antwoord-blokken terug (de tool-resultaten zitten ertussen). */
 export async function askWeb(system: string, userText: string, maxUses = 4, maxTokens = 2500): Promise<string> {
-  const res = await client().messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system,
-    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxUses }] as any,
-    messages: [{ role: 'user', content: userText }],
-  });
+  const res = await withRetry(() =>
+    client().messages.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      system,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxUses }] as any,
+      messages: [{ role: 'user', content: userText }],
+    }),
+  );
   return res.content
     .filter((c: any) => c.type === 'text')
     .map((c: any) => c.text)

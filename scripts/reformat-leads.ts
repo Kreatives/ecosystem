@@ -15,7 +15,7 @@ import type { RawLead } from '../lib/apify';
 
 const titleText = (p: any) => (p?.title || []).map((t: any) => t.plain_text).join('').trim();
 
-async function reformat(pageId: string) {
+export async function reformat(pageId: string) {
   const page: any = await notion().pages.retrieve({ page_id: pageId });
   const pr = page.properties;
   const naam = titleText(pr['Lead']);
@@ -84,4 +84,5 @@ async function main() {
   console.log('\nKlaar.');
 }
 
-main();
+// Alleen draaien als dit script zelf wordt aangeroepen (niet bij import).
+if (process.argv[1] && /reformat-leads\.ts$/.test(process.argv[1])) main();
