@@ -50,8 +50,11 @@ export async function schrijfBerichten(
 ): Promise<Berichten> {
   const ctx = await context(type, lead, siteTekst);
   const naam = ctx.voornaam || '{voornaam}';
-  const comp = compliment || '{compliment over het bedrijf}';
-  const pp = pijnpunten.length ? pijnpunten : ['{observatie + consequentie}'];
+  // Pijnpunten zijn geschreven in de stijl "Ik zag dat [sterk punt], maar [de site
+  // laat dat niet zien]" — ze dragen het compliment dus al in zich. Daarom staat er
+  // in de berichten geen losse compliment-regel meer.
+  const pp = pijnpunten.length ? pijnpunten : ['{compliment over het bedrijf}, maar de site laat dat nu niet zien'];
+  void compliment;
 
   if (type === 'partner') {
     const watDoen = ctx.watZijDoen || '{wat zij doen}';
@@ -79,34 +82,34 @@ export async function schrijfBerichten(
   const instagram = platform === 'instagram';
   if (instagram) {
     // Instagram: luchtiger en korter, "Hey/Yo", max 3-4 zinnen, geen Day 1.
-    const system = `Je schrijft Instagram-outreach voor Ricky (webdesigner). Houd je EXACT aan deze opbouw per bericht, luchtig en kort (max 3-4 korte zinnen), opening "Hey" of "Yo", nooit "Goedemiddag". Geen gedachtestreepjes, geen "geen X maar Y", geen uitroeptekens-feest.
+    const system = `Je schrijft Instagram-outreach voor Ricky (webdesigner). Luchtig en kort, opening "Hey" of "Yo", nooit "Goedemiddag". Geen gedachtestreepjes, geen "geen X maar Y", geen uitroeptekens-feest.
 
-Lever 5 Day-2-varianten, één per meegegeven pijnpunt, volgens dit sjabloon (vul {naam}, {compliment} kort, {observatie}):
-"Hey {naam}, zag jullie pagina en heb even op de site gekeken. {compliment kort}
-Eén ding viel me op: {observatie + consequentie kort}
-Zal ik de rest in een filmpje van 3 min doorsturen? Kun je zelf oppakken, geen verplichting."
+Lever 5 Day-2-varianten, één per meegegeven pijnpunt. Elke variant volgt dit sjabloon, waarbij de observatie de stijl "Ik zag dat [sterk punt], maar [de site laat dat niet zien]" houdt (korter dan op LinkedIn):
+"Hey {naam}, zag jullie pagina en keek even op de site. {observatie in ik-zag-dat-stijl, kort}
+Zal ik de rest in een filmpje van 3 min sturen? Kun je zelf oppakken, geen verplichting."
 
 Antwoord UITSLUITEND met JSON: {"varianten": string[5]}`;
     const j = await askJson<{ varianten: string[] }>(
       system,
-      [{ type: 'text', text: `Naam: ${naam}\nCompliment: ${comp}\nPijnpunten:\n${pp.map((p, i) => `${i + 1}. ${p}`).join('\n')}` }],
+      [{ type: 'text', text: `Naam: ${naam}\nPijnpunten (ik-zag-dat-stijl):\n${pp.map((p, i) => `${i + 1}. ${p}`).join('\n')}` }],
       { varianten: [] },
       1200,
     );
-    const varianten = (j.varianten || []).length ? j.varianten : pp.map((p) => `Hey ${naam}, zag jullie pagina en heb even op de site gekeken. ${comp}\nEén ding viel me op: ${p}\nZal ik de rest in een filmpje van 3 min doorsturen? Kun je zelf oppakken, geen verplichting.`);
+    const varianten = (j.varianten || []).length ? j.varianten : pp.map((p) => `Hey ${naam}, zag jullie pagina en keek even op de site. ${p}\nZal ik de rest in een filmpje van 3 min sturen? Kun je zelf oppakken, geen verplichting.`);
     return {
       kanaal: 'Instagram',
       items: [
         ...varianten.slice(0, 5).map((v, i) => ({ label: `Day 2 — variant ${i + 1}`, tekst: v })),
-        { label: 'Day 3 — geen reactie', tekst: `Hey ${naam}, nog één ding dat me opviel: ${pp[1] || pp[0]}\nZal ik die video alsnog maken?` },
+        { label: 'Day 3 — geen reactie', tekst: `Hey ${naam}, nog iets: ${pp[1] || pp[0]}\nZal ik die video alsnog maken?` },
         { label: 'Day 4 — call', tekst: `Zin om samen even door de site te lopen? 30 min, dan hoor je eerlijk of een kleine ingreep genoeg is. Past {dag} of {dag}?` },
       ],
     };
   }
 
-  // LinkedIn (standaard voor klant): vaste opbouw, 5 Day-2-varianten.
+  // LinkedIn (standaard voor klant): vaste opbouw, 5 Day-2-varianten. De observatie
+  // is zelf de "Ik zag dat [sterk punt], maar [de site laat dat niet zien]"-zin.
   const day2 = (obs: string) =>
-    `Hey ${naam}, ik was nieuwsgierig en heb even op jullie site gekeken.\n\n${comp}\n\nWat me opviel: ${obs}\n\nIk heb nog een aantal andere punten op de website gevonden. Zal ik ze in een korte video (3 min) voor je doorlopen?\n\nJe kunt ze zelf oppakken en er zit geen verplichting aan :)`;
+    `Hey ${naam}, ik was nieuwsgierig en heb even op jullie site gekeken.\n\n${obs}\n\nIk heb nog een aantal andere punten op de website gevonden. Zal ik ze in een korte video (3 min) voor je doorlopen?\n\nJe kunt ze zelf oppakken en er zit geen verplichting aan :)`;
 
   const items: Bericht[] = [
     { label: 'Day 1 — Na connectie', tekst: `Hey ${naam}, bedankt voor de connectie!` },
@@ -117,7 +120,7 @@ Antwoord UITSLUITEND met JSON: {"varianten": string[5]}`;
     },
     {
       label: 'Day 3 — geen reactie',
-      tekst: `Hey ${naam}, nog één ding dat ik zag: ${pp[1] || pp[0]}.\n\nZal ik die video alsnog maken?`,
+      tekst: `Hey ${naam}, nog iets: ${pp[1] || pp[0]}\n\nZal ik die video alsnog maken?`,
     },
     {
       label: 'Day 4 — Call-voorstel',
