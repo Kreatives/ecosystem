@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Pipeline, type PipelineStep, type StepState } from "@/components/Pipeline";
 
@@ -13,9 +13,18 @@ const STEP_DEFS: { key: string; title: string }[] = [
 
 type StepInfo = { state: StepState; counter?: string; errors: { naam: string; reden: string }[] };
 type Summary = { gevonden: number; gekwalificeerd: number; weggegooid: number; naarNotion: number; seconden: number };
+type Status = { status: "running" | "done" | "error"; steps: Record<string, StepInfo>; summary: Summary | null; error: string | null; logs: string[] };
 
-function initialSteps(): Record<string, StepInfo> {
-  return Object.fromEntries(STEP_DEFS.map((s) => [s.key, { state: "upcoming" as StepState, errors: [] }]));
+const STORE_KEY = "keco-active-run";
+
+function toPipeline(steps: Record<string, StepInfo>): PipelineStep[] {
+  return STEP_DEFS.map((d) => ({
+    key: d.key,
+    title: d.title,
+    state: steps[d.key]?.state || "upcoming",
+    counter: steps[d.key]?.counter,
+    errors: steps[d.key]?.errors || [],
+  }));
 }
 
 export default function ScrapePage() {
@@ -26,58 +35,56 @@ export default function ScrapePage() {
   const [dryRun, setDryRun] = useState(false);
 
   const [running, setRunning] = useState(false);
-  const [steps, setSteps] = useState<Record<string, StepInfo>>(initialSteps());
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [data, setData] = useState<Status | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const esRef = useRef<EventSource | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const pipelineSteps: PipelineStep[] = STEP_DEFS.map((d) => ({
-    key: d.key,
-    title: d.title,
-    state: steps[d.key].state,
-    counter: steps[d.key].counter,
-    errors: steps[d.key].errors,
-  }));
+  const poll = useCallback(async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/run/${jobId}/status`, { cache: "no-store" });
+      const d: Status = await res.json();
+      if (!res.ok) throw new Error((d as any).error || "status onbekend");
+      setData(d);
+      if (d.status === "running") {
+        timer.current = setTimeout(() => poll(jobId), 2000);
+      } else {
+        setRunning(false);
+        localStorage.removeItem(STORE_KEY);
+        if (d.status === "error") setError(d.error || "run mislukt");
+      }
+    } catch (e: any) {
+      // tijdelijke hapering: blijf proberen
+      timer.current = setTimeout(() => poll(jobId), 3000);
+    }
+  }, []);
+
+  // Bij laden: loopt er nog een run? Pak 'm weer op.
+  useEffect(() => {
+    const jobId = typeof window !== "undefined" ? localStorage.getItem(STORE_KEY) : null;
+    if (jobId) {
+      setRunning(true);
+      poll(jobId);
+    }
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [poll]);
 
   async function start() {
     if (!prompt.trim() || running) return;
     setError(null);
-    setSummary(null);
-    setSteps(initialSteps());
+    setData(null);
     setRunning(true);
     try {
-      const qs = new URLSearchParams({
-        brief: prompt,
-        aantal: String(aantal),
-        type,
-        platform,
-        dryRun: dryRun ? "1" : "0",
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brief: prompt, aantal, type, platform, dryRun }),
       });
-      const es = new EventSource(`/api/run/stream?${qs}`);
-      esRef.current = es;
-      es.onmessage = (ev) => {
-        const e = JSON.parse(ev.data);
-        if (e.kind === "step") {
-          setSteps((prev) => ({ ...prev, [e.key]: { ...prev[e.key], state: e.state, counter: e.counter } }));
-        } else if (e.kind === "leaderror") {
-          setSteps((prev) => ({
-            ...prev,
-            [e.key]: { ...prev[e.key], errors: [...prev[e.key].errors, { naam: e.naam, reden: e.reden }] },
-          }));
-        } else if (e.kind === "done") {
-          setSummary(e.summary);
-          setRunning(false);
-          es.close();
-        } else if (e.kind === "error") {
-          setError(e.msg);
-          setRunning(false);
-          es.close();
-        }
-      };
-      es.onerror = () => {
-        es.close();
-        setRunning(false);
-      };
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Starten mislukt");
+      localStorage.setItem(STORE_KEY, d.jobId);
+      poll(d.jobId);
     } catch (e: any) {
       setError(e.message);
       setRunning(false);
@@ -85,14 +92,15 @@ export default function ScrapePage() {
   }
 
   function reset() {
-    esRef.current?.close();
-    setSteps(initialSteps());
-    setSummary(null);
+    if (timer.current) clearTimeout(timer.current);
+    localStorage.removeItem(STORE_KEY);
+    setData(null);
     setError(null);
     setRunning(false);
   }
 
-  const started = running || summary !== null || error !== null;
+  const started = running || data !== null || error !== null;
+  const summary = data?.status === "done" ? data.summary : null;
 
   return (
     <>
@@ -100,7 +108,7 @@ export default function ScrapePage() {
         <div>
           <div className="page-title">Nieuwe run</div>
           <div className="page-sub">
-            Beschrijf wie je zoekt. Claude vertaalt dat naar zoekopdrachten voor Apify.
+            Beschrijf wie je zoekt. De run draait door op de achtergrond, ook als je wegklikt.
           </div>
         </div>
       </div>
@@ -150,10 +158,11 @@ export default function ScrapePage() {
               Nieuwe run
             </button>
           )}
+          {running && <span className="run-note">Je kunt wegklikken — de run loopt door.</span>}
         </div>
       </div>
 
-      {started && <Pipeline steps={pipelineSteps} />}
+      {started && data && <Pipeline steps={toPipeline(data.steps)} />}
 
       {summary && (
         <div className="run-summary">

@@ -154,6 +154,8 @@ export async function schrijfLead(
   if (platform) {
     props[P.platform] = P.platformType === 'multi_select' ? { multi_select: [{ name: platform }] } : { select: { name: platform } };
   }
+  // Partners-DB heeft een "Datum gescraped" (date); zet de vinddatum.
+  if (type === 'partner') props['Datum gescraped'] = { date: { start: new Date().toISOString().slice(0, 10) } };
 
   const page: any = await notion().pages.create({
     parent: { database_id: dbIdFor(type) },
