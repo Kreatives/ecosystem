@@ -1,14 +1,9 @@
 import { NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getJob } from '@/lib/jobs';
-import { triggerTick } from '@/lib/chunk';
+import { triggerTick, resolveBaseUrl } from '@/lib/chunk';
 
 const STALE_MS = 90_000; // zonder update al 90s → keten vermoedelijk gebroken
-
-function baseUrl(req: Request): string {
-  const env = process.env.RUN_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-  return env || new URL(req.url).origin;
-}
 
 /** GET /api/run/:id/status — huidige stand van een run, uit Supabase (overleeft
  *  navigeren) met het geheugen als snelle fallback. Plus de laatste logregels.
@@ -28,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         if (age > STALE_MS) {
           // Touch updated_at zodat volgende polls niet óók aftrappen (debounce).
           await sb.from('jobs').update({ updated_at: new Date().toISOString() }).eq('id', id).then(() => {}, () => {});
-          const base = baseUrl(req);
+          const base = resolveBaseUrl(req);
           after(() => triggerTick(base, id));
         }
       }

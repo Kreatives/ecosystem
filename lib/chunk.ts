@@ -87,6 +87,20 @@ async function loadProgress(jobId: string): Promise<{ status: string; progress: 
   return { status: data.status as string, progress: data.progress as Progress };
 }
 
+/**
+ * Basis-URL voor de interne tick-fetch. MOET de publieke productie-alias zijn:
+ * de deployment-specifieke URL (VERCEL_URL) zit achter Vercel Authentication, dus
+ * een server-naar-zichzelf fetch daarheen krijgt 401/302 en de keten breekt.
+ * VERCEL_PROJECT_PRODUCTION_URL is de onbeschermde productie-alias.
+ */
+export function resolveBaseUrl(req: Request): string {
+  const explicit = process.env.RUN_BASE_URL;
+  if (explicit) return explicit.startsWith('http') ? explicit : `https://${explicit}`;
+  const prod = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (prod) return `https://${prod}`;
+  return new URL(req.url).origin; // lokaal / fallback
+}
+
 /** Trapt (fire-and-forget) de volgende tick af in een verse serverless-invocatie. */
 export async function triggerTick(baseUrl: string, jobId: string): Promise<void> {
   const headers: Record<string, string> = {
