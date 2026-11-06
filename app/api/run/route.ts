@@ -1,11 +1,17 @@
 import { NextResponse, after } from 'next/server';
-import { createJob, sweep } from '@/lib/jobs';
-import { runPipeline, type RunInput } from '@/lib/run-pipeline';
+import { sweep } from '@/lib/jobs';
+import { startRun, type RunInput } from '@/lib/chunk';
 import type { DbType } from '@/lib/env';
 
-// De run draait in after(): die blijft leven ná de response, dus ook als je de
-// pagina verlaat (tot de functie-tijdslimiet). De voortgang staat in Supabase.
+// De run is opgeknipt in korte "ticks" die elkaar doorketenen (lib/chunk.ts),
+// zodat hij de 300s serverless-limiet overleeft. De voortgang staat in Supabase.
 export const maxDuration = 300;
+
+/** Basis-URL van deze deployment, voor de interne tick-fetch. */
+function baseUrl(req: Request): string {
+  const env = process.env.RUN_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+  return env || new URL(req.url).origin;
+}
 
 /** POST /api/run — start een run. Geeft meteen een jobId terug; volg de voortgang
  *  via GET /api/run/:id/status (pollt Supabase, overleeft navigeren). */
@@ -23,15 +29,18 @@ export async function POST(req: Request) {
   };
 
   sweep();
-  const job = createJob('scrape', { brief: input.brief, type: input.type, platform: input.platform });
+  const base = baseUrl(req);
 
+  // Brief lezen + Apify starten + job aanmaken gebeurt in after() (kost een paar
+  // seconden); de response met jobId komt meteen terug.
+  const jobId = `job_${Date.now().toString(36)}_${Math.round(Math.random() * 1e9).toString(36)}`;
   after(async () => {
     try {
-      await runPipeline(job, input);
+      await startRun({ ...input }, base, jobId);
     } catch {
-      /* de pipeline vangt zijn eigen fouten al af en logt ze */
+      /* startRun logt zelf; de pipeline vangt fouten af */
     }
   });
 
-  return NextResponse.json({ jobId: job.id });
+  return NextResponse.json({ jobId });
 }

@@ -26,21 +26,21 @@ export type RawLead = {
   bron: 'google-maps' | 'instagram' | 'linkedin' | 'deepapi';
 };
 
-async function run(actor: string, input: any, memory = 1024): Promise<any[]> {
-  const started = await client().actor(actor).call(input, { memory });
-  const { items } = await client().dataset(started.defaultDatasetId).listItems();
-  return items as any[];
-}
+const MAPS_ACTOR = 'compass/crawler-google-places';
+const IG_ACTOR = 'apify/instagram-search-scraper';
 
-export async function scrapeMaps(queries: string[], perQuery: number): Promise<RawLead[]> {
-  const items = await run('compass/crawler-google-places', {
+function mapsInput(queries: string[], perQuery: number) {
+  return {
     searchStringsArray: queries,
     maxCrawledPlacesPerSearch: perQuery,
     language: 'nl',
     countryCode: 'nl',
     skipClosedPlaces: true,
     scrapePlaceDetailPage: true,
-  });
+  };
+}
+
+function mapMaps(items: any[]): RawLead[] {
   return items.map((p) => ({
     naam: p.title as string,
     website: (p.website as string) || '',
@@ -52,16 +52,14 @@ export async function scrapeMaps(queries: string[], perQuery: number): Promise<R
   }));
 }
 
-export async function scrapeInstagramSearch(searchTerms: string[], perTerm: number): Promise<RawLead[]> {
-  if (!searchTerms.length) return [];
-  const items = await run('apify/instagram-search-scraper', {
-    search: searchTerms.join(', '),
-    searchType: 'user',
-    searchLimit: perTerm,
-  });
+function igInput(searchTerms: string[], perTerm: number) {
+  return { search: searchTerms.join(', '), searchType: 'user', searchLimit: perTerm };
+}
+
+function mapIg(items: any[]): RawLead[] {
   const gezien = new Set<string>();
   const leads: RawLead[] = [];
-  for (const p of items as any[]) {
+  for (const p of items) {
     const username = p.username as string;
     if (!username || gezien.has(username)) continue;
     gezien.add(username);
@@ -77,6 +75,68 @@ export async function scrapeInstagramSearch(searchTerms: string[], perTerm: numb
     });
   }
   return leads;
+}
+
+async function run(actor: string, input: any, memory = 1024): Promise<any[]> {
+  const started = await client().actor(actor).call(input, { memory });
+  const { items } = await client().dataset(started.defaultDatasetId).listItems();
+  return items as any[];
+}
+
+export async function scrapeMaps(queries: string[], perQuery: number): Promise<RawLead[]> {
+  return mapMaps(await run(MAPS_ACTOR, mapsInput(queries, perQuery)));
+}
+
+export async function scrapeInstagramSearch(searchTerms: string[], perTerm: number): Promise<RawLead[]> {
+  if (!searchTerms.length) return [];
+  return mapIg(await run(IG_ACTOR, igInput(searchTerms, perTerm)));
+}
+
+// ---- Niet-blokkerend scrapen (voor de chunked web-run die de 300s-limiet moet
+//      overleven): start de actors, poll ze later, haal pas de items op als klaar. ----
+export type Source = 'google-maps' | 'instagram';
+export type ScrapeRef = { source: Source; runId: string; datasetId: string; term: string };
+
+type ScrapePlan = { sources: Source[]; mapsTerms: string[]; instagramTerms: string[] };
+
+/** Start de scrape-actors zonder op ze te wachten. Geeft run-referenties terug. */
+export async function startScrape(plan: ScrapePlan, maxItems: number): Promise<ScrapeRef[]> {
+  const refs: ScrapeRef[] = [];
+  for (const bron of plan.sources) {
+    if (bron === 'instagram' && plan.instagramTerms.length) {
+      const perTerm = Math.max(5, Math.ceil(maxItems / plan.instagramTerms.length));
+      const r: any = await client().actor(IG_ACTOR).start(igInput(plan.instagramTerms, perTerm));
+      refs.push({ source: 'instagram', runId: r.id, datasetId: r.defaultDatasetId, term: plan.instagramTerms.join(', ') });
+    } else if (bron === 'google-maps' && plan.mapsTerms.length) {
+      const perQuery = Math.max(3, Math.ceil(maxItems / plan.mapsTerms.length));
+      const r: any = await client().actor(MAPS_ACTOR).start(mapsInput(plan.mapsTerms, perQuery), { memory: 1024 });
+      refs.push({ source: 'google-maps', runId: r.id, datasetId: r.defaultDatasetId, term: plan.mapsTerms.join(', ') });
+    }
+  }
+  return refs;
+}
+
+/** Pollt lopende scrape-runs. allDone = alle runs in een eindtoestand; leads =
+ *  de verzamelde resultaten van de geslaagde runs (alleen zinvol als allDone). */
+export async function pollScrape(refs: ScrapeRef[]): Promise<{ allDone: boolean; leads: RawLead[]; statuses: string[] }> {
+  const statuses: string[] = [];
+  const leads: RawLead[] = [];
+  let allDone = true;
+  for (const ref of refs) {
+    const r: any = await client().run(ref.runId).get();
+    const status = (r?.status as string) || 'UNKNOWN';
+    statuses.push(status);
+    const terminal = ['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT', 'TIMED_OUT'].includes(status);
+    if (!terminal) {
+      allDone = false;
+      continue;
+    }
+    if (status === 'SUCCEEDED') {
+      const { items } = await client().dataset(ref.datasetId).listItems();
+      leads.push(...(ref.source === 'google-maps' ? mapMaps(items as any[]) : mapIg(items as any[])));
+    }
+  }
+  return { allDone, leads, statuses };
 }
 
 export async function scrapeLinkedinSearch(opts: {
